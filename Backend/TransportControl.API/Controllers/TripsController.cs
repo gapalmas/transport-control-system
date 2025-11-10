@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TransportControl.Core.Entities;
-using TransportControl.Infrastructure.Data;
+using TransportControl.Core.Interfaces;
+using TransportControl.API.DTOs;
 
 namespace TransportControl.API.Controllers;
 
@@ -13,13 +13,110 @@ namespace TransportControl.API.Controllers;
 [Produces("application/json")]
 public class TripsController : ControllerBase
 {
-    private readonly TransportDbContext _context;
+    private readonly ITripService _tripService;
     private readonly ILogger<TripsController> _logger;
 
-    public TripsController(TransportDbContext context, ILogger<TripsController> logger)
+    public TripsController(ITripService tripService, ILogger<TripsController> logger)
     {
-        _context = context;
+        _tripService = tripService;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Convierte una entidad Trip a TripResponseDto
+    /// </summary>
+    /// <param name="trip">Entidad Trip</param>
+    /// <returns>DTO de respuesta</returns>
+    private static TripResponseDto MapToTripResponseDto(Trip trip)
+    {
+        return new TripResponseDto
+        {
+            Id = trip.Id,
+            OriginId = trip.OriginId,
+            OriginName = trip.Origin?.Name ?? string.Empty,
+            Origin = trip.Origin != null ? MapToPlaceResponseDto(trip.Origin) : new PlaceResponseDto(),
+            DestinationId = trip.DestinationId,
+            DestinationName = trip.Destination?.Name ?? string.Empty,
+            Destination = trip.Destination != null ? MapToPlaceResponseDto(trip.Destination) : new PlaceResponseDto(),
+            OperatorId = trip.OperatorId,
+            OperatorName = trip.Operator?.FullName ?? string.Empty,
+            Operator = trip.Operator != null ? MapToOperatorResponseDto(trip.Operator) : new OperatorResponseDto(),
+            ScheduledStartDateTime = trip.ScheduledStartDateTime,
+            ScheduledEndDateTime = trip.ScheduledEndDateTime,
+            ActualStartDateTime = trip.ActualStartDateTime,
+            ActualEndDateTime = trip.ActualEndDateTime,
+            Status = (int)trip.Status,
+            EstimatedDistance = trip.EstimatedDistance,
+            ActualDistance = trip.ActualDistance,
+            Notes = trip.Notes,
+            VehicleId = trip.VehicleId,
+            CreatedAt = trip.CreatedAt,
+            ModifiedAt = trip.ModifiedAt
+        };
+    }
+
+    /// <summary>
+    /// Convierte una entidad Place a PlaceResponseDto
+    /// </summary>
+    /// <param name="place">Entidad Place</param>
+    /// <returns>DTO de respuesta</returns>
+    private static PlaceResponseDto MapToPlaceResponseDto(Place place)
+    {
+        return new PlaceResponseDto
+        {
+            Id = place.Id,
+            Name = place.Name,
+            Code = place.Code,
+            Description = place.Description,
+            Address = place.Address,
+            City = place.City,
+            State = place.State,
+            Country = place.Country,
+            PostalCode = place.PostalCode,
+            Latitude = place.Latitude,
+            Longitude = place.Longitude,
+            Type = (int)place.Type,
+            Status = (int)place.Status,
+            IsOriginAllowed = place.IsOriginAllowed,
+            IsDestinationAllowed = place.IsDestinationAllowed,
+            ContactPerson = place.ContactPerson,
+            ContactPhone = place.ContactPhone,
+            ContactEmail = place.ContactEmail,
+            OperatingHoursStart = place.OperatingHoursStart,
+            OperatingHoursEnd = place.OperatingHoursEnd,
+            SpecialInstructions = place.SpecialInstructions,
+            CreatedAt = place.CreatedAt,
+            ModifiedAt = place.ModifiedAt
+        };
+    }
+
+    /// <summary>
+    /// Convierte una entidad Operator a OperatorResponseDto
+    /// </summary>
+    /// <param name="operatorEntity">Entidad Operator</param>
+    /// <returns>DTO de respuesta</returns>
+    private static OperatorResponseDto MapToOperatorResponseDto(Operator operatorEntity)
+    {
+        return new OperatorResponseDto
+        {
+            Id = operatorEntity.Id,
+            FirstName = operatorEntity.FirstName,
+            LastName = operatorEntity.LastName,
+            FullName = operatorEntity.FullName,
+            Email = operatorEntity.Email,
+            Phone = operatorEntity.Phone,
+            EmployeeId = operatorEntity.EmployeeId,
+            LicenseNumber = operatorEntity.LicenseNumber,
+            LicenseExpiryDate = operatorEntity.LicenseExpiryDate,
+            Status = (int)operatorEntity.Status,
+            DateOfBirth = operatorEntity.DateOfBirth,
+            HireDate = operatorEntity.HireDate,
+            Address = operatorEntity.Address,
+            EmergencyContact = operatorEntity.EmergencyContact,
+            EmergencyPhone = operatorEntity.EmergencyPhone,
+            CreatedAt = operatorEntity.CreatedAt,
+            ModifiedAt = operatorEntity.ModifiedAt
+        };
     }
 
     /// <summary>
@@ -29,20 +126,15 @@ public class TripsController : ControllerBase
     /// <param name="pageSize">Tamaño de página (por defecto 10)</param>
     /// <returns>Lista paginada de viajes</returns>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Trip>>> GetTrips(int page = 1, int pageSize = 10)
+    public async Task<ActionResult<IEnumerable<TripResponseDto>>> GetTrips(int page = 1, int pageSize = 10)
     {
         try
         {
-            var trips = await _context.Trips
-                .Include(t => t.Origin)
-                .Include(t => t.Destination)
-                .Include(t => t.Operator)
-                .OrderByDescending(t => t.ScheduledStartDateTime)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+            var trips = await _tripService.GetTripsAsync(page, pageSize);
+            
+            var tripDtos = trips.Select(MapToTripResponseDto);
 
-            return Ok(trips);
+            return Ok(tripDtos);
         }
         catch (Exception ex)
         {
@@ -57,22 +149,20 @@ public class TripsController : ControllerBase
     /// <param name="id">ID del viaje</param>
     /// <returns>Viaje encontrado</returns>
     [HttpGet("{id}")]
-    public async Task<ActionResult<Trip>> GetTrip(int id)
+    public async Task<ActionResult<TripResponseDto>> GetTrip(int id)
     {
         try
         {
-            var trip = await _context.Trips
-                .Include(t => t.Origin)
-                .Include(t => t.Destination)
-                .Include(t => t.Operator)
-                .FirstOrDefaultAsync(t => t.Id == id);
+            var trip = await _tripService.GetTripByIdAsync(id);
 
             if (trip == null)
             {
                 return NotFound($"Viaje con ID {id} no encontrado");
             }
 
-            return Ok(trip);
+            var tripDto = MapToTripResponseDto(trip);
+
+            return Ok(tripDto);
         }
         catch (Exception ex)
         {
@@ -84,54 +174,39 @@ public class TripsController : ControllerBase
     /// <summary>
     /// Crea un nuevo viaje
     /// </summary>
-    /// <param name="trip">Datos del viaje a crear</param>
+    /// <param name="createTripDto">Datos del viaje a crear</param>
     /// <returns>Viaje creado</returns>
     [HttpPost]
-    public async Task<ActionResult<Trip>> CreateTrip(Trip trip)
+    public async Task<ActionResult<TripResponseDto>> CreateTrip(CreateTripDto createTripDto)
     {
         try
         {
-            // Validaciones básicas
-            if (!await _context.Places.AnyAsync(p => p.Id == trip.OriginId))
+            // Crear la entidad Trip desde el DTO
+            var trip = new Trip
             {
-                return BadRequest("El lugar de origen especificado no existe");
-            }
+                OriginId = createTripDto.OriginId,
+                DestinationId = createTripDto.DestinationId,
+                OperatorId = createTripDto.OperatorId,
+                ScheduledStartDateTime = createTripDto.ScheduledStartDateTime,
+                ScheduledEndDateTime = createTripDto.ScheduledEndDateTime,
+                ActualStartDateTime = createTripDto.ActualStartDateTime,
+                ActualEndDateTime = createTripDto.ActualEndDateTime,
+                Status = (TripStatus)createTripDto.Status,
+                EstimatedDistance = createTripDto.EstimatedDistance,
+                ActualDistance = createTripDto.ActualDistance,
+                Notes = createTripDto.Notes,
+                VehicleId = createTripDto.VehicleId
+            };
 
-            if (!await _context.Places.AnyAsync(p => p.Id == trip.DestinationId))
-            {
-                return BadRequest("El lugar de destino especificado no existe");
-            }
+            var createdTrip = await _tripService.CreateTripAsync(trip);
+            var tripResponse = MapToTripResponseDto(createdTrip);
 
-            if (!await _context.Operators.AnyAsync(o => o.Id == trip.OperatorId))
-            {
-                return BadRequest("El operador especificado no existe");
-            }
-
-            if (trip.ScheduledStartDateTime >= trip.ScheduledEndDateTime)
-            {
-                return BadRequest("La fecha de inicio debe ser anterior a la fecha de fin");
-            }
-
-            // Configurar valores por defecto
-            trip.Status = TripStatus.Scheduled;
-            trip.CreatedAt = DateTime.UtcNow;
-            trip.ModifiedAt = DateTime.UtcNow;
-
-            _context.Trips.Add(trip);
-            await _context.SaveChangesAsync();
-
-            // Recargar el viaje con las relaciones
-            await _context.Entry(trip)
-                .Reference(t => t.Origin)
-                .LoadAsync();
-            await _context.Entry(trip)
-                .Reference(t => t.Destination)
-                .LoadAsync();
-            await _context.Entry(trip)
-                .Reference(t => t.Operator)
-                .LoadAsync();
-
-            return CreatedAtAction(nameof(GetTrip), new { id = trip.Id }, trip);
+            return CreatedAtAction(nameof(GetTrip), new { id = createdTrip.Id }, tripResponse);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Error de validación al crear viaje");
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -144,74 +219,35 @@ public class TripsController : ControllerBase
     /// Actualiza un viaje existente
     /// </summary>
     /// <param name="id">ID del viaje a actualizar</param>
-    /// <param name="trip">Datos actualizados del viaje</param>
+    /// <param name="updateTripDto">Datos actualizados del viaje</param>
     /// <returns>Viaje actualizado</returns>
     [HttpPut("{id}")]
-    public async Task<ActionResult<Trip>> UpdateTrip(int id, Trip trip)
+    public async Task<ActionResult<TripResponseDto>> UpdateTrip(int id, UpdateTripDto updateTripDto)
     {
         try
         {
-            if (id != trip.Id)
+            // Crear la entidad Trip con los datos actualizados
+            var trip = new Trip
             {
-                return BadRequest("El ID del viaje no coincide");
-            }
+                Id = id,
+                OriginId = updateTripDto.OriginId,
+                DestinationId = updateTripDto.DestinationId,
+                OperatorId = updateTripDto.OperatorId,
+                ScheduledStartDateTime = updateTripDto.ScheduledStartDateTime,
+                ScheduledEndDateTime = updateTripDto.ScheduledEndDateTime,
+                Status = updateTripDto.Status,
+                ActualStartDateTime = updateTripDto.ActualStartDateTime,
+                ActualEndDateTime = updateTripDto.ActualEndDateTime,
+                EstimatedDistance = updateTripDto.EstimatedDistance,
+                ActualDistance = updateTripDto.ActualDistance,
+                Notes = updateTripDto.Notes,
+                VehicleId = updateTripDto.VehicleId
+            };
 
-            var existingTrip = await _context.Trips.FindAsync(id);
-            if (existingTrip == null)
-            {
-                return NotFound($"Viaje con ID {id} no encontrado");
-            }
+            var updatedTrip = await _tripService.UpdateTripAsync(trip);
+            var responseDto = MapToTripResponseDto(updatedTrip);
 
-            // Validaciones
-            if (!await _context.Places.AnyAsync(p => p.Id == trip.OriginId))
-            {
-                return BadRequest("El lugar de origen especificado no existe");
-            }
-
-            if (!await _context.Places.AnyAsync(p => p.Id == trip.DestinationId))
-            {
-                return BadRequest("El lugar de destino especificado no existe");
-            }
-
-            if (!await _context.Operators.AnyAsync(o => o.Id == trip.OperatorId))
-            {
-                return BadRequest("El operador especificado no existe");
-            }
-
-            if (trip.ScheduledStartDateTime >= trip.ScheduledEndDateTime)
-            {
-                return BadRequest("La fecha de inicio debe ser anterior a la fecha de fin");
-            }
-
-            // Actualizar campos
-            existingTrip.OriginId = trip.OriginId;
-            existingTrip.DestinationId = trip.DestinationId;
-            existingTrip.OperatorId = trip.OperatorId;
-            existingTrip.ScheduledStartDateTime = trip.ScheduledStartDateTime;
-            existingTrip.ScheduledEndDateTime = trip.ScheduledEndDateTime;
-            existingTrip.Status = trip.Status;
-            existingTrip.ActualStartDateTime = trip.ActualStartDateTime;
-            existingTrip.ActualEndDateTime = trip.ActualEndDateTime;
-            existingTrip.EstimatedDistance = trip.EstimatedDistance;
-            existingTrip.ActualDistance = trip.ActualDistance;
-            existingTrip.Notes = trip.Notes;
-            existingTrip.VehicleId = trip.VehicleId;
-            existingTrip.ModifiedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            // Recargar con relaciones
-            await _context.Entry(existingTrip)
-                .Reference(t => t.Origin)
-                .LoadAsync();
-            await _context.Entry(existingTrip)
-                .Reference(t => t.Destination)
-                .LoadAsync();
-            await _context.Entry(existingTrip)
-                .Reference(t => t.Operator)
-                .LoadAsync();
-
-            return Ok(existingTrip);
+            return Ok(responseDto);
         }
         catch (Exception ex)
         {
@@ -219,6 +255,8 @@ public class TripsController : ControllerBase
             return StatusCode(500, "Error interno del servidor");
         }
     }
+
+
 
     /// <summary>
     /// Elimina un viaje
@@ -230,14 +268,11 @@ public class TripsController : ControllerBase
     {
         try
         {
-            var trip = await _context.Trips.FindAsync(id);
-            if (trip == null)
+            var deleted = await _tripService.DeleteTripAsync(id);
+            if (!deleted)
             {
                 return NotFound($"Viaje con ID {id} no encontrado");
             }
-
-            _context.Trips.Remove(trip);
-            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -249,24 +284,19 @@ public class TripsController : ControllerBase
     }
 
     /// <summary>
-    /// Obtiene viajes por estado
+    /// Obtiene viajes filtrados por estado
     /// </summary>
     /// <param name="status">Estado del viaje</param>
     /// <returns>Lista de viajes con el estado especificado</returns>
     [HttpGet("by-status/{status}")]
-    public async Task<ActionResult<IEnumerable<Trip>>> GetTripsByStatus(TripStatus status)
+    public async Task<ActionResult<IEnumerable<TripResponseDto>>> GetTripsByStatus(TripStatus status)
     {
         try
         {
-            var trips = await _context.Trips
-                .Include(t => t.Origin)
-                .Include(t => t.Destination)
-                .Include(t => t.Operator)
-                .Where(t => t.Status == status)
-                .OrderByDescending(t => t.ScheduledStartDateTime)
-                .ToListAsync();
+            var trips = await _tripService.GetTripsByStatusAsync(status);
+            var tripDtos = trips.Select(MapToTripResponseDto);
 
-            return Ok(trips);
+            return Ok(tripDtos);
         }
         catch (Exception ex)
         {
@@ -274,4 +304,40 @@ public class TripsController : ControllerBase
             return StatusCode(500, "Error interno del servidor");
         }
     }
+
+    /// <summary>
+    /// Actualiza solo el estado de un viaje
+    /// </summary>
+    /// <param name="id">ID del viaje a actualizar</param>
+    /// <param name="updateStatusDto">Datos del nuevo estado</param>
+    /// <returns>Viaje actualizado</returns>
+    [HttpPatch("{id}/status")]
+    public async Task<ActionResult<TripResponseDto>> UpdateTripStatus(int id, UpdateTripStatusDto updateStatusDto)
+    {
+        try
+        {
+            var updatedTrip = await _tripService.UpdateTripStatusAsync(
+                id, 
+                updateStatusDto.Status, 
+                updateStatusDto.ActualStartDateTime, 
+                updateStatusDto.ActualEndDateTime, 
+                updateStatusDto.Notes
+            );
+
+            var responseDto = MapToTripResponseDto(updatedTrip);
+            return Ok(responseDto);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Error al actualizar estado del viaje con ID {TripId}", id);
+            return BadRequest(ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al actualizar el estado del viaje con ID {TripId}", id);
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+
 }

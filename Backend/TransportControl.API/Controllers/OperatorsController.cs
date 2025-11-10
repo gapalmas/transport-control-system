@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TransportControl.Core.Entities;
-using TransportControl.Infrastructure.Data;
+using TransportControl.Core.Interfaces;
+using TransportControl.API.DTOs;
 
 namespace TransportControl.API.Controllers;
 
@@ -13,31 +13,57 @@ namespace TransportControl.API.Controllers;
 [Produces("application/json")]
 public class OperatorsController : ControllerBase
 {
-    private readonly TransportDbContext _context;
+    private readonly IOperatorService _operatorService;
     private readonly ILogger<OperatorsController> _logger;
 
-    public OperatorsController(TransportDbContext context, ILogger<OperatorsController> logger)
+    public OperatorsController(IOperatorService operatorService, ILogger<OperatorsController> logger)
     {
-        _context = context;
+        _operatorService = operatorService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Obtiene todos los operadores
+    /// Convierte una entidad Operator a OperatorResponseDto
     /// </summary>
-    /// <returns>Lista de operadores</returns>
+    /// <param name="operatorEntity">Entidad Operator</param>
+    /// <returns>DTO de respuesta</returns>
+    private static OperatorResponseDto MapToOperatorResponseDto(Operator operatorEntity)
+    {
+        return new OperatorResponseDto
+        {
+            Id = operatorEntity.Id,
+            FirstName = operatorEntity.FirstName,
+            LastName = operatorEntity.LastName,
+            FullName = operatorEntity.FullName,
+            Email = operatorEntity.Email,
+            Phone = operatorEntity.Phone,
+            EmployeeId = operatorEntity.EmployeeId,
+            LicenseNumber = operatorEntity.LicenseNumber,
+            LicenseExpiryDate = operatorEntity.LicenseExpiryDate,
+            Status = (int)operatorEntity.Status,
+            DateOfBirth = operatorEntity.DateOfBirth,
+            HireDate = operatorEntity.HireDate,
+            Address = operatorEntity.Address,
+            EmergencyContact = operatorEntity.EmergencyContact,
+            EmergencyPhone = operatorEntity.EmergencyPhone,
+            CreatedAt = operatorEntity.CreatedAt,
+            ModifiedAt = operatorEntity.ModifiedAt
+        };
+    }
+
+    /// <summary>
+    /// Obtiene todos los operadores activos (sin paginación, para dropdowns)
+    /// </summary>
+    /// <returns>Lista de operadores activos</returns>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Operator>>> GetOperators()
+    public async Task<ActionResult<IEnumerable<OperatorResponseDto>>> GetOperators()
     {
         try
         {
-            var operators = await _context.Operators
-                .Where(o => o.Status == OperatorStatus.Active)
-                .OrderBy(o => o.LastName)
-                .ThenBy(o => o.FirstName)
-                .ToListAsync();
+            var operators = await _operatorService.GetActiveOperatorsAsync();
+            var operatorDtos = operators.Select(MapToOperatorResponseDto);
 
-            return Ok(operators);
+            return Ok(operatorDtos);
         }
         catch (Exception ex)
         {
@@ -52,18 +78,19 @@ public class OperatorsController : ControllerBase
     /// <param name="id">ID del operador</param>
     /// <returns>Operador encontrado</returns>
     [HttpGet("{id}")]
-    public async Task<ActionResult<Operator>> GetOperator(int id)
+    public async Task<ActionResult<OperatorResponseDto>> GetOperator(int id)
     {
         try
         {
-            var operatorEntity = await _context.Operators.FindAsync(id);
+            var operatorEntity = await _operatorService.GetOperatorByIdAsync(id);
 
             if (operatorEntity == null)
             {
                 return NotFound($"Operador con ID {id} no encontrado");
             }
 
-            return Ok(operatorEntity);
+            var operatorDto = MapToOperatorResponseDto(operatorEntity);
+            return Ok(operatorDto);
         }
         catch (Exception ex)
         {
@@ -82,45 +109,20 @@ public class OperatorsController : ControllerBase
     {
         try
         {
-            // Validaciones
-            if (string.IsNullOrWhiteSpace(operatorEntity.FirstName))
-            {
-                return BadRequest("El nombre es requerido");
-            }
+            var createdOperator = await _operatorService.CreateOperatorAsync(operatorEntity);
+            var operatorDto = MapToOperatorResponseDto(createdOperator);
 
-            if (string.IsNullOrWhiteSpace(operatorEntity.LastName))
-            {
-                return BadRequest("El apellido es requerido");
-            }
-
-            // Verificar duplicados
-            if (!string.IsNullOrEmpty(operatorEntity.EmployeeId))
-            {
-                var existingByEmployeeId = await _context.Operators
-                    .AnyAsync(o => o.EmployeeId == operatorEntity.EmployeeId);
-                if (existingByEmployeeId)
-                {
-                    return BadRequest("Ya existe un operador con este ID de empleado");
-                }
-            }
-
-            if (!string.IsNullOrEmpty(operatorEntity.Email))
-            {
-                var existingByEmail = await _context.Operators
-                    .AnyAsync(o => o.Email == operatorEntity.Email);
-                if (existingByEmail)
-                {
-                    return BadRequest("Ya existe un operador con este email");
-                }
-            }
-
-            operatorEntity.CreatedAt = DateTime.UtcNow;
-            operatorEntity.ModifiedAt = DateTime.UtcNow;
-
-            _context.Operators.Add(operatorEntity);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetOperator), new { id = operatorEntity.Id }, operatorEntity);
+            return CreatedAtAction(nameof(GetOperator), new { id = createdOperator.Id }, operatorDto);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Error de validación al crear operador");
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Error de operación al crear operador");
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -136,7 +138,7 @@ public class OperatorsController : ControllerBase
     /// <param name="operatorEntity">Datos actualizados del operador</param>
     /// <returns>Operador actualizado</returns>
     [HttpPut("{id}")]
-    public async Task<ActionResult<Operator>> UpdateOperator(int id, Operator operatorEntity)
+    public async Task<ActionResult<OperatorResponseDto>> UpdateOperator(int id, Operator operatorEntity)
     {
         try
         {
@@ -145,42 +147,15 @@ public class OperatorsController : ControllerBase
                 return BadRequest("El ID del operador no coincide");
             }
 
-            var existing = await _context.Operators.FindAsync(id);
-            if (existing == null)
-            {
-                return NotFound($"Operador con ID {id} no encontrado");
-            }
+            var updatedOperator = await _operatorService.UpdateOperatorAsync(operatorEntity);
+            var operatorDto = MapToOperatorResponseDto(updatedOperator);
 
-            // Validaciones
-            if (string.IsNullOrWhiteSpace(operatorEntity.FirstName))
-            {
-                return BadRequest("El nombre es requerido");
-            }
-
-            if (string.IsNullOrWhiteSpace(operatorEntity.LastName))
-            {
-                return BadRequest("El apellido es requerido");
-            }
-
-            // Actualizar campos
-            existing.FirstName = operatorEntity.FirstName;
-            existing.LastName = operatorEntity.LastName;
-            existing.Email = operatorEntity.Email;
-            existing.Phone = operatorEntity.Phone;
-            existing.EmployeeId = operatorEntity.EmployeeId;
-            existing.LicenseNumber = operatorEntity.LicenseNumber;
-            existing.LicenseExpiryDate = operatorEntity.LicenseExpiryDate;
-            existing.Status = operatorEntity.Status;
-            existing.DateOfBirth = operatorEntity.DateOfBirth;
-            existing.HireDate = operatorEntity.HireDate;
-            existing.Address = operatorEntity.Address;
-            existing.EmergencyContact = operatorEntity.EmergencyContact;
-            existing.EmergencyPhone = operatorEntity.EmergencyPhone;
-            existing.ModifiedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(existing);
+            return Ok(operatorDto);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Error de validación al actualizar operador con ID {OperatorId}", id);
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {

@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using TransportControl.Core.Entities;
-using TransportControl.Infrastructure.Data;
+using TransportControl.Core.Interfaces;
+using TransportControl.API.DTOs;
 
 namespace TransportControl.API.Controllers;
 
@@ -13,34 +13,79 @@ namespace TransportControl.API.Controllers;
 [Produces("application/json")]
 public class PlacesController : ControllerBase
 {
-    private readonly TransportDbContext _context;
+    private readonly IPlaceService _placeService;
     private readonly ILogger<PlacesController> _logger;
 
-    public PlacesController(TransportDbContext context, ILogger<PlacesController> logger)
+    public PlacesController(IPlaceService placeService, ILogger<PlacesController> logger)
     {
-        _context = context;
+        _placeService = placeService;
         _logger = logger;
     }
 
     /// <summary>
-    /// Obtiene todos los lugares
+    /// Convierte una entidad Place a PlaceResponseDto
     /// </summary>
-    /// <returns>Lista de lugares</returns>
+    /// <param name="place">Entidad Place</param>
+    /// <returns>DTO de respuesta</returns>
+    private static PlaceResponseDto MapToPlaceResponseDto(Place place)
+    {
+        return new PlaceResponseDto
+        {
+            Id = place.Id,
+            Name = place.Name,
+            Code = place.Code,
+            Description = place.Description,
+            Address = place.Address,
+            City = place.City,
+            State = place.State,
+            Country = place.Country,
+            PostalCode = place.PostalCode,
+            Latitude = place.Latitude,
+            Longitude = place.Longitude,
+            Type = (int)place.Type,
+            Status = (int)place.Status,
+            IsOriginAllowed = place.IsOriginAllowed,
+            IsDestinationAllowed = place.IsDestinationAllowed,
+            CreatedAt = place.CreatedAt,
+            ModifiedAt = place.ModifiedAt
+        };
+    }
+
+    /// <summary>
+    /// Obtiene todos los lugares con paginación
+    /// </summary>
+    /// <param name="page">Número de página (inicia en 1)</param>
+    /// <param name="pageSize">Tamaño de página (máximo 100)</param>
+    /// <returns>Lista paginada de lugares</returns>
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Place>>> GetPlaces()
+    public async Task<IActionResult> GetPlaces(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
         try
         {
-            var places = await _context.Places
-                .Where(p => p.Status == PlaceStatus.Active)
-                .OrderBy(p => p.Name)
-                .ToListAsync();
+            var places = await _placeService.GetPlacesAsync(page, pageSize);
+            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
 
-            return Ok(places);
+            var totalCount = await _placeService.GetPlacesCountAsync();
+            var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+            var response = new
+            {
+                Data = placeDtos,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                HasNextPage = page < totalPages,
+                HasPreviousPage = page > 1
+            };
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error al obtener los lugares");
+            _logger.LogError(ex, "Error al obtener lugares");
             return StatusCode(500, "Error interno del servidor");
         }
     }
@@ -51,18 +96,19 @@ public class PlacesController : ControllerBase
     /// <param name="id">ID del lugar</param>
     /// <returns>Lugar encontrado</returns>
     [HttpGet("{id}")]
-    public async Task<ActionResult<Place>> GetPlace(int id)
+    public async Task<ActionResult<PlaceResponseDto>> GetPlace(int id)
     {
         try
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _placeService.GetPlaceByIdAsync(id);
 
             if (place == null)
             {
                 return NotFound($"Lugar con ID {id} no encontrado");
             }
 
-            return Ok(place);
+            var placeDto = MapToPlaceResponseDto(place);
+            return Ok(placeDto);
         }
         catch (Exception ex)
         {
@@ -77,34 +123,24 @@ public class PlacesController : ControllerBase
     /// <param name="place">Datos del lugar a crear</param>
     /// <returns>Lugar creado</returns>
     [HttpPost]
-    public async Task<ActionResult<Place>> CreatePlace(Place place)
+    public async Task<ActionResult<PlaceResponseDto>> CreatePlace(Place place)
     {
         try
         {
-            // Validaciones
-            if (string.IsNullOrWhiteSpace(place.Name))
-            {
-                return BadRequest("El nombre del lugar es requerido");
-            }
-
-            // Verificar duplicado por código si se proporciona
-            if (!string.IsNullOrEmpty(place.Code))
-            {
-                var existingByCode = await _context.Places
-                    .AnyAsync(p => p.Code == place.Code);
-                if (existingByCode)
-                {
-                    return BadRequest("Ya existe un lugar con este código");
-                }
-            }
-
-            place.CreatedAt = DateTime.UtcNow;
-            place.ModifiedAt = DateTime.UtcNow;
-
-            _context.Places.Add(place);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetPlace), new { id = place.Id }, place);
+            var createdPlace = await _placeService.CreatePlaceAsync(place);
+            var placeDto = MapToPlaceResponseDto(createdPlace);
+            
+            return CreatedAtAction(nameof(GetPlace), new { id = createdPlace.Id }, placeDto);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Validación falló al crear lugar");
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Operación inválida al crear lugar");
+            return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
@@ -120,7 +156,7 @@ public class PlacesController : ControllerBase
     /// <param name="place">Datos actualizados del lugar</param>
     /// <returns>Lugar actualizado</returns>
     [HttpPut("{id}")]
-    public async Task<ActionResult<Place>> UpdatePlace(int id, Place place)
+    public async Task<ActionResult<PlaceResponseDto>> UpdatePlace(int id, Place place)
     {
         try
         {
@@ -129,44 +165,20 @@ public class PlacesController : ControllerBase
                 return BadRequest("El ID del lugar no coincide");
             }
 
-            var existing = await _context.Places.FindAsync(id);
-            if (existing == null)
-            {
-                return NotFound($"Lugar con ID {id} no encontrado");
-            }
+            var updatedPlace = await _placeService.UpdatePlaceAsync(id, place);
+            var placeDto = MapToPlaceResponseDto(updatedPlace);
 
-            // Validaciones
-            if (string.IsNullOrWhiteSpace(place.Name))
-            {
-                return BadRequest("El nombre del lugar es requerido");
-            }
-
-            // Actualizar campos
-            existing.Name = place.Name;
-            existing.Code = place.Code;
-            existing.Description = place.Description;
-            existing.Address = place.Address;
-            existing.City = place.City;
-            existing.State = place.State;
-            existing.Country = place.Country;
-            existing.PostalCode = place.PostalCode;
-            existing.Latitude = place.Latitude;
-            existing.Longitude = place.Longitude;
-            existing.Type = place.Type;
-            existing.Status = place.Status;
-            existing.IsOriginAllowed = place.IsOriginAllowed;
-            existing.IsDestinationAllowed = place.IsDestinationAllowed;
-            existing.ContactPerson = place.ContactPerson;
-            existing.ContactPhone = place.ContactPhone;
-            existing.ContactEmail = place.ContactEmail;
-            existing.OperatingHoursStart = place.OperatingHoursStart;
-            existing.OperatingHoursEnd = place.OperatingHoursEnd;
-            existing.SpecialInstructions = place.SpecialInstructions;
-            existing.ModifiedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(existing);
+            return Ok(placeDto);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex, "Validación falló al actualizar lugar con ID {PlaceId}", id);
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Operación inválida al actualizar lugar con ID {PlaceId}", id);
+            return NotFound(ex.Message);
         }
         catch (Exception ex)
         {
@@ -176,20 +188,39 @@ public class PlacesController : ControllerBase
     }
 
     /// <summary>
+    /// Obtiene todos los lugares activos para dropdowns (sin paginación)
+    /// </summary>
+    /// <returns>Lista de lugares activos</returns>
+    [HttpGet("all")]
+    public async Task<ActionResult<IEnumerable<PlaceResponseDto>>> GetAllActivePlaces()
+    {
+        try
+        {
+            var places = await _placeService.GetActivePlacesAsync();
+            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
+
+            return Ok(placeDtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener los lugares activos");
+            return StatusCode(500, "Error interno del servidor");
+        }
+    }
+
+    /// <summary>
     /// Obtiene lugares que pueden ser origen
     /// </summary>
     /// <returns>Lista de lugares origen</returns>
     [HttpGet("origins")]
-    public async Task<ActionResult<IEnumerable<Place>>> GetOriginPlaces()
+    public async Task<ActionResult<IEnumerable<PlaceResponseDto>>> GetOriginPlaces()
     {
         try
         {
-            var places = await _context.Places
-                .Where(p => p.Status == PlaceStatus.Active && p.IsOriginAllowed)
-                .OrderBy(p => p.Name)
-                .ToListAsync();
+            var places = await _placeService.GetOriginPlacesAsync();
+            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
 
-            return Ok(places);
+            return Ok(placeDtos);
         }
         catch (Exception ex)
         {
@@ -203,16 +234,14 @@ public class PlacesController : ControllerBase
     /// </summary>
     /// <returns>Lista de lugares destino</returns>
     [HttpGet("destinations")]
-    public async Task<ActionResult<IEnumerable<Place>>> GetDestinationPlaces()
+    public async Task<ActionResult<IEnumerable<PlaceResponseDto>>> GetDestinationPlaces()
     {
         try
         {
-            var places = await _context.Places
-                .Where(p => p.Status == PlaceStatus.Active && p.IsDestinationAllowed)
-                .OrderBy(p => p.Name)
-                .ToListAsync();
+            var places = await _placeService.GetDestinationPlacesAsync();
+            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
 
-            return Ok(places);
+            return Ok(placeDtos);
         }
         catch (Exception ex)
         {
