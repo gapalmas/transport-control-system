@@ -1,0 +1,245 @@
+<!-- Toolbar -->
+<mat-toolbar color="primary">
+  <mat-icon>directions_bus</mat-icon>
+  <span style="margin-left: 10px;">Gestión de Viajes</span>
+  <span class="spacer"></span>
+</mat-toolbar>
+
+<div class="container">
+  <!-- Loading Spinner -->
+  <div *ngIf="isLoading" class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Cargando...</p>
+  </div>
+
+  <!-- Trip Form -->
+  <mat-card class="form-card">
+    <mat-card-header>
+      <mat-card-title>
+        {{ isEditing ? 'Editar Viaje' : 'Nuevo Viaje' }}
+      </mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="tripForm" (ngSubmit)="onSubmit()">
+        <div class="form-row">
+          <!-- Origin -->
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Origen</mat-label>
+            <mat-select formControlName="originId" required>
+              <mat-option *ngFor="let place of places" [value]="place.id">
+                {{ place.name }}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="tripForm.get('originId')?.invalid">
+              El origen es requerido
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Destination -->
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Destino</mat-label>
+            <mat-select formControlName="destinationId" required>
+              <mat-option *ngFor="let place of places" [value]="place.id">
+                {{ place.name }}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="tripForm.get('destinationId')?.invalid">
+              El destino es requerido
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <!-- Operator -->
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Operador</mat-label>
+            <mat-select formControlName="operatorId" required>
+              <mat-option *ngFor="let operator of operators" [value]="operator.id">
+                {{ operator.fullName }}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="tripForm.get('operatorId')?.invalid">
+              El operador es requerido
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Scheduled Date -->
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Fecha Programada</mat-label>
+            <input matInput
+                   [matDatepicker]="picker"
+                   formControlName="scheduledDate"
+                   required>
+            <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+            <mat-datepicker #picker></mat-datepicker>
+            <mat-error *ngIf="tripForm.get('scheduledDate')?.invalid">
+              La fecha es requerida
+            </mat-error>
+          </mat-form-field>
+        </div>
+
+        <div class="form-row">
+          <!-- Status -->
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Estado</mat-label>
+            <mat-select formControlName="status" required>
+              <mat-option *ngFor="let status of statusOptions" [value]="status.value">
+                {{ status.label }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <!-- Notes -->
+          <mat-form-field appearance="outline" class="form-field">
+            <mat-label>Notas</mat-label>
+            <textarea matInput
+                      formControlName="notes"
+                      rows="3"
+                      placeholder="Notas adicionales..."></textarea>
+          </mat-form-field>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button mat-raised-button
+                  color="primary"
+                  type="submit"
+                  [disabled]="tripForm.invalid || isLoading">
+            <mat-icon>{{ isEditing ? 'save' : 'add' }}</mat-icon>
+            {{ isEditing ? 'Actualizar' : 'Crear' }} Viaje
+          </button>
+
+          <button mat-button
+                  type="button"
+                  (click)="resetForm()"
+                  [disabled]="isLoading">
+            <mat-icon>cancel</mat-icon>
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Trips Table -->
+  <mat-card class="table-card">
+    <mat-card-header>
+      <mat-card-title>Lista de Viajes</mat-card-title>
+    </mat-card-header>
+
+    <mat-card-content>
+      <!-- Search Filter -->
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Buscar viajes...</mat-label>
+        <input matInput (keyup)="applyFilter($event)" placeholder="Buscar por origen, destino u operador">
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <!-- Data Table -->
+      <div class="table-container">
+        <table mat-table [dataSource]="dataSource" matSort class="trips-table">
+          <!-- ID Column -->
+          <ng-container matColumnDef="id">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>ID</th>
+            <td mat-cell *matCellDef="let trip">{{ trip.id }}</td>
+          </ng-container>
+
+          <!-- Origin Column -->
+          <ng-container matColumnDef="origin">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Origen</th>
+            <td mat-cell *matCellDef="let trip">{{ getOriginName(trip) }}</td>
+          </ng-container>
+
+          <!-- Destination Column -->
+          <ng-container matColumnDef="destination">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Destino</th>
+            <td mat-cell *matCellDef="let trip">{{ getDestinationName(trip) }}</td>
+          </ng-container>
+
+          <!-- Operator Column -->
+          <ng-container matColumnDef="operator">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Operador</th>
+            <td mat-cell *matCellDef="let trip">{{ getTripOperatorName(trip) }}</td>
+          </ng-container>
+
+          <!-- Scheduled Date Column -->
+          <ng-container matColumnDef="scheduledDate">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha Programada</th>
+            <td mat-cell *matCellDef="let trip">
+              {{ trip.scheduledStartDateTime | date:'dd/MM/yyyy HH:mm' }}
+            </td>
+          </ng-container>
+
+          <!-- Status Column -->
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+            <td mat-cell *matCellDef="let trip">
+              <span class="status-badge" [ngClass]="'status-' + trip.status">
+                {{ getStatusLabel(trip.status) }}
+              </span>
+            </td>
+          </ng-container>
+
+          <!-- Actions Column -->
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let trip">
+              <!-- Status Change Buttons -->
+              <button mat-icon-button
+                      color="accent"
+                      *ngIf="canStartTrip(trip)"
+                      (click)="startTrip(trip)"
+                      matTooltip="Iniciar viaje">
+                <mat-icon>play_arrow</mat-icon>
+              </button>
+              <button mat-icon-button
+                      color="primary"
+                      *ngIf="canCompleteTrip(trip)"
+                      (click)="completeTrip(trip)"
+                      matTooltip="Completar viaje">
+                <mat-icon>check_circle</mat-icon>
+              </button>
+              <button mat-icon-button
+                      color="warn"
+                      *ngIf="canCancelTrip(trip)"
+                      (click)="cancelTrip(trip)"
+                      matTooltip="Cancelar viaje">
+                <mat-icon>cancel</mat-icon>
+              </button>
+
+              <!-- Edit and Delete Buttons -->
+              <button mat-icon-button
+                      color="primary"
+                      (click)="editTrip(trip)"
+                      matTooltip="Editar viaje">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button
+                      color="warn"
+                      (click)="deleteTrip(trip.id)"
+                      matTooltip="Eliminar viaje">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+        </table>
+
+        <!-- No Data Message -->
+        <div *ngIf="dataSource.data.length === 0 && !isLoading" class="no-data">
+          <mat-icon>info</mat-icon>
+          <p>No hay viajes registrados</p>
+        </div>
+      </div>
+
+      <!-- Paginator -->
+      <mat-paginator
+        [pageSizeOptions]="[5, 10, 20]"
+        showFirstLastButtons>
+      </mat-paginator>
+    </mat-card-content>
+  </mat-card>
+</div>
