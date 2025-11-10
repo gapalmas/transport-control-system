@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TransportControl.Core.Interfaces;
 using TransportControl.Infrastructure.Data;
 
 namespace TransportControl.Infrastructure.Extensions;
@@ -46,11 +47,10 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        // Aquí se pueden registrar otros servicios de infraestructura como:
-        // - Repositorios
-        // - Servicios externos
-        // - Cachés
-        // - etc.
+        // Registrar servicios de dominio
+        services.AddScoped<ITripService, Services.TripService>();
+        services.AddScoped<IOperatorService, Services.OperatorService>();
+        services.AddScoped<IPlaceService, Services.PlaceService>();
 
         return services;
     }
