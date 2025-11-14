@@ -11,17 +11,12 @@ var app = builder.Build();
 await app.InitializeSeedDataAsync();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Transport Control API v1");
-        c.RoutePrefix = string.Empty; // Para que Swagger sea la página inicial
-    });
-}
-
-app.UseHttpsRedirection();
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Transport Control API v1");
+    c.RoutePrefix = "swagger"; // Swagger disponible en /swagger
+});
 
 app.UseCors("AllowAngularApp");
 

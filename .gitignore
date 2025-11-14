@@ -421,8 +421,7 @@ Dockerfile.dev
 docker-compose.override.yml
 docker-compose.local.yml
 
-# Environment variables
-.env
+# Environment variables (keeping .env for demo purposes with random credentials)
 .env.local
 .env.development
 .env.test

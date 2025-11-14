@@ -1,19 +1,21 @@
 # Sistema de Control de Transporte
 
 ## Descripción
-Aplicación web para el registro y control de viajes de transporte, desarrollada con Clean Architecture.
-
-## Tecnologías
-- **Backend**: .NET 8 con Clean Architecture
-- **Frontend**: Angular
-- **Base de datos**: SQL Server
-- **Contenedores**: Docker
-- **Despliegue**: Docker Hub, Vercel
-
-# Sistema de Control de Transporte
-
-## Descripción
 Sistema web para el registro y control de viajes de transporte desarrollado con .NET 8 y Clean Architecture. Permite gestionar viajes programados con información completa de origen, destino, operadores y seguimiento de estados.
+
+## 🚀 Inicio Rápido con Docker
+
+**La forma más rápida de ejecutar el proyecto completo:**
+
+```bash
+cd Source
+docker compose up
+```
+
+**URLs de acceso:**
+- Frontend: http://localhost (ej: http://localhost/trips)
+- Backend API: http://localhost:5000
+- Swagger UI: http://localhost:5000/swagger
 
 ## Estado del Proyecto
 ✅ **Backend API REST completamente funcional**
@@ -22,7 +24,15 @@ Sistema web para el registro y control de viajes de transporte desarrollado con 
 - Endpoints CRUD operativos
 - Swagger UI configurado
 
-🔄 **Frontend Angular** (Pendiente)
+✅ **Frontend Angular completamente funcional**
+- Interfaz completa con Angular Material
+- CRUD de Viajes, Operadores y Lugares
+- Navegación y routing configurado
+
+✅ **Despliegue con Docker**
+- Configuración docker-compose lista
+- Imágenes multi-stage optimizadas
+- Listo para producción
 
 ## Tecnologías Implementadas
 
@@ -119,17 +129,38 @@ Source/Backend/
 
 ## Instalación y Ejecución
 
-### Prerrequisitos
+### Opción 1: Docker (Recomendado)
+
+**Prerrequisitos:**
+- Docker instalado
+- Docker Compose
+
+**Ejecutar:**
+```bash
+cd Source
+docker compose up --build
+```
+
+La aplicación estará disponible en:
+- **Frontend**: http://localhost (ej: http://localhost/trips)
+- **Backend API**: http://localhost:5000
+- **Swagger UI**: http://localhost:5000/swagger
+
+Para más detalles sobre Docker, ver [DOCKER-README.md](DOCKER-README.md)
+
+### Opción 2: Ejecución Manual
+
+#### Prerrequisitos
 - .NET 8 SDK
-- Acceso a SQL Server
+- Node.js 20+
 - Git
 
-### Configuración
+#### Backend
+#### Backend
 
-1. **Clonar el repositorio**
+1. **Navegar al backend**
 ```bash
-git clone <repository-url>
-cd transport-proyect/Source/Backend
+cd Source/Backend
 ```
 
 2. **Restaurar dependencias**
@@ -137,18 +168,34 @@ cd transport-proyect/Source/Backend
 dotnet restore
 ```
 
-3. **Configurar base de datos**
-   - Actualizar cadena de conexión en `appsettings.json`
-   - La migración ya está aplicada a la base de datos
-
-4. **Ejecutar la aplicación**
+3. **Ejecutar la aplicación**
 ```bash
 dotnet run --project TransportControl.API
 ```
 
-5. **Acceder a Swagger UI**
-   - URL: `http://localhost:5153`
-   - Documentación interactiva de todos los endpoints
+4. **Acceder al backend**
+   - API: `http://localhost:5000`
+   - Swagger UI: `http://localhost:5000/swagger`
+
+#### Frontend
+
+1. **Navegar al frontend**
+```bash
+cd Source/Frontend
+```
+
+2. **Instalar dependencias**
+```bash
+npm install
+```
+
+3. **Ejecutar en desarrollo**
+```bash
+ng serve
+```
+
+4. **Acceder al frontend**
+   - URL: `http://localhost:4200`
 
 ### Comandos de Entity Framework
 
@@ -194,51 +241,63 @@ dotnet ef migrations remove --project TransportControl.Infrastructure --startup-
 
 ## Características Principales
 
-### Funcionalidades
-- ✅ Registro de viajes
-- ✅ Modificación de viajes
-- ✅ Gestión de catálogos (Operadores, Lugares)
-- ✅ Consulta de viajes
+### Funcionalidades Implementadas
+- ✅ Registro y gestión completa de viajes
+- ✅ Administración de operadores de transporte
+- ✅ Gestión de catálogo de lugares (origen/destino)
+- ✅ Interfaz de usuario responsive con Angular Material
+- ✅ API REST documentada con Swagger
+- ✅ Despliegue con Docker y docker-compose
+- ✅ Arquitectura limpia y escalable
 
 ### Información del Viaje
-- **Origen**: Lugar de inicio del viaje
-- **Destino**: Lugar donde termina el viaje
-- **Fecha y Hora de Inicio Programado**
-- **Fecha y Hora de Fin Programado**
-- **Operador**: Persona que realiza el viaje
-
-## Instalación y Ejecución
-
-### Backend (.NET 8)
-```bash
-cd Source/Backend
-dotnet restore
-dotnet build
-dotnet run --project WebAPI
-```
-
-### Frontend (Angular)
-```bash
-cd Source/Frontend
-npm install
-ng serve
-```
-
-### Docker
-```bash
-docker-compose up -d
-```
+- **Origen y Destino**: Lugares de inicio y fin del viaje
+- **Fechas programadas**: Inicio y fin planificados
+- **Fechas reales**: Registro de tiempos efectivos
+- **Operador asignado**: Conductor del viaje
+- **Estados**: Programado, En Progreso, Completado, Cancelado
+- **Distancias**: Estimadas y reales
+- **Notas y vehículo**: Información adicional
 
 ## Base de Datos
 
-El proyecto utiliza Code First con Entity Framework Core para la gestión de la base de datos.
+El proyecto utiliza SQL Server con Code First de Entity Framework Core.
 
-### Migraciones
+**Servidor**: somee.com (remoto)
+**Estrategia**: Code First con migraciones automáticas
+
+### Migraciones (si es necesario)
 ```bash
 cd Source/Backend/Infrastructure
-dotnet ef migrations add InitialCreate
-dotnet ef database update
+dotnet ef migrations add NombreMigracion --startup-project ../TransportControl.API
+dotnet ef database update --startup-project ../TransportControl.API
 ```
+
+## Tecnología Stack
+
+### Backend
+- **.NET 8** - Framework principal
+- **Entity Framework Core 8.0** - ORM
+- **SQL Server** - Base de datos
+- **Swagger/OpenAPI** - Documentación de API
+- **Clean Architecture** - Patrón arquitectónico
+
+### Frontend
+- **Angular 20** - Framework SPA
+- **Angular Material** - Componentes UI
+- **RxJS** - Programación reactiva
+- **TypeScript** - Lenguaje tipado
+
+### DevOps
+- **Docker** - Contenedores
+- **Docker Compose** - Orquestación
+- **Nginx** - Servidor web y proxy reverso
+- **GitHub** - Control de versiones
+
+## Documentación Adicional
+
+- [Documentación de Docker](DOCKER-README.md) - Guía completa de despliegue con Docker
+- [API Endpoints](http://localhost:5000/swagger) - Documentación interactiva de la API
 
 ## Contribución
 

@@ -12,6 +12,7 @@ namespace TransportControl.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Tags("Places")]
 public class PlacesController : ControllerBase
 {
     private readonly IPlaceService _placeService;

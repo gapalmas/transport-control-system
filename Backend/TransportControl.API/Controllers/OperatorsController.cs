@@ -12,6 +12,7 @@ namespace TransportControl.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Tags("Operators")]
 public class OperatorsController : ControllerBase
 {
     private readonly IOperatorService _operatorService;
