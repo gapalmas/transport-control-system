@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using TransportControl.Core.Entities;
 using TransportControl.Core.Interfaces;
 using TransportControl.API.DTOs;
+using TransportControl.API.Mappings;
 
 namespace TransportControl.API.Controllers;
 
@@ -23,35 +24,6 @@ public class PlacesController : ControllerBase
     }
 
     /// <summary>
-    /// Convierte una entidad Place a PlaceResponseDto
-    /// </summary>
-    /// <param name="place">Entidad Place</param>
-    /// <returns>DTO de respuesta</returns>
-    private static PlaceResponseDto MapToPlaceResponseDto(Place place)
-    {
-        return new PlaceResponseDto
-        {
-            Id = place.Id,
-            Name = place.Name,
-            Code = place.Code,
-            Description = place.Description,
-            Address = place.Address,
-            City = place.City,
-            State = place.State,
-            Country = place.Country,
-            PostalCode = place.PostalCode,
-            Latitude = place.Latitude,
-            Longitude = place.Longitude,
-            Type = (int)place.Type,
-            Status = (int)place.Status,
-            IsOriginAllowed = place.IsOriginAllowed,
-            IsDestinationAllowed = place.IsDestinationAllowed,
-            CreatedAt = place.CreatedAt,
-            ModifiedAt = place.ModifiedAt
-        };
-    }
-
-    /// <summary>
     /// Obtiene todos los lugares con paginación
     /// </summary>
     /// <param name="page">Número de página (inicia en 1)</param>
@@ -65,7 +37,7 @@ public class PlacesController : ControllerBase
         try
         {
             var places = await _placeService.GetPlacesAsync(page, pageSize);
-            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
+            var placeDtos = places.ToResponseDto().ToList();
 
             var totalCount = await _placeService.GetPlacesCountAsync();
             var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
@@ -107,7 +79,7 @@ public class PlacesController : ControllerBase
                 return NotFound($"Lugar con ID {id} no encontrado");
             }
 
-            var placeDto = MapToPlaceResponseDto(place);
+            var placeDto = place.ToResponseDto();
             return Ok(placeDto);
         }
         catch (Exception ex)
@@ -128,7 +100,7 @@ public class PlacesController : ControllerBase
         try
         {
             var createdPlace = await _placeService.CreatePlaceAsync(place);
-            var placeDto = MapToPlaceResponseDto(createdPlace);
+            var placeDto = createdPlace.ToResponseDto();
             
             return CreatedAtAction(nameof(GetPlace), new { id = createdPlace.Id }, placeDto);
         }
@@ -166,7 +138,7 @@ public class PlacesController : ControllerBase
             }
 
             var updatedPlace = await _placeService.UpdatePlaceAsync(id, place);
-            var placeDto = MapToPlaceResponseDto(updatedPlace);
+            var placeDto = updatedPlace.ToResponseDto();
 
             return Ok(placeDto);
         }
@@ -197,7 +169,7 @@ public class PlacesController : ControllerBase
         try
         {
             var places = await _placeService.GetActivePlacesAsync();
-            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
+            var placeDtos = places.ToResponseDto().ToList();
 
             return Ok(placeDtos);
         }
@@ -218,7 +190,7 @@ public class PlacesController : ControllerBase
         try
         {
             var places = await _placeService.GetOriginPlacesAsync();
-            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
+            var placeDtos = places.ToResponseDto().ToList();
 
             return Ok(placeDtos);
         }
@@ -239,7 +211,7 @@ public class PlacesController : ControllerBase
         try
         {
             var places = await _placeService.GetDestinationPlacesAsync();
-            var placeDtos = places.Select(MapToPlaceResponseDto).ToList();
+            var placeDtos = places.ToResponseDto().ToList();
 
             return Ok(placeDtos);
         }

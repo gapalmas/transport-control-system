@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using TransportControl.Core.Entities;
 using TransportControl.Core.Interfaces;
 using TransportControl.API.DTOs;
+using TransportControl.API.Mappings;
 
 namespace TransportControl.API.Controllers;
 
@@ -23,103 +24,6 @@ public class TripsController : ControllerBase
     }
 
     /// <summary>
-    /// Convierte una entidad Trip a TripResponseDto
-    /// </summary>
-    /// <param name="trip">Entidad Trip</param>
-    /// <returns>DTO de respuesta</returns>
-    private static TripResponseDto MapToTripResponseDto(Trip trip)
-    {
-        return new TripResponseDto
-        {
-            Id = trip.Id,
-            OriginId = trip.OriginId,
-            OriginName = trip.Origin?.Name ?? string.Empty,
-            Origin = trip.Origin != null ? MapToPlaceResponseDto(trip.Origin) : new PlaceResponseDto(),
-            DestinationId = trip.DestinationId,
-            DestinationName = trip.Destination?.Name ?? string.Empty,
-            Destination = trip.Destination != null ? MapToPlaceResponseDto(trip.Destination) : new PlaceResponseDto(),
-            OperatorId = trip.OperatorId,
-            OperatorName = trip.Operator?.FullName ?? string.Empty,
-            Operator = trip.Operator != null ? MapToOperatorResponseDto(trip.Operator) : new OperatorResponseDto(),
-            ScheduledStartDateTime = trip.ScheduledStartDateTime,
-            ScheduledEndDateTime = trip.ScheduledEndDateTime,
-            ActualStartDateTime = trip.ActualStartDateTime,
-            ActualEndDateTime = trip.ActualEndDateTime,
-            Status = (int)trip.Status,
-            EstimatedDistance = trip.EstimatedDistance,
-            ActualDistance = trip.ActualDistance,
-            Notes = trip.Notes,
-            VehicleId = trip.VehicleId,
-            CreatedAt = trip.CreatedAt,
-            ModifiedAt = trip.ModifiedAt
-        };
-    }
-
-    /// <summary>
-    /// Convierte una entidad Place a PlaceResponseDto
-    /// </summary>
-    /// <param name="place">Entidad Place</param>
-    /// <returns>DTO de respuesta</returns>
-    private static PlaceResponseDto MapToPlaceResponseDto(Place place)
-    {
-        return new PlaceResponseDto
-        {
-            Id = place.Id,
-            Name = place.Name,
-            Code = place.Code,
-            Description = place.Description,
-            Address = place.Address,
-            City = place.City,
-            State = place.State,
-            Country = place.Country,
-            PostalCode = place.PostalCode,
-            Latitude = place.Latitude,
-            Longitude = place.Longitude,
-            Type = (int)place.Type,
-            Status = (int)place.Status,
-            IsOriginAllowed = place.IsOriginAllowed,
-            IsDestinationAllowed = place.IsDestinationAllowed,
-            ContactPerson = place.ContactPerson,
-            ContactPhone = place.ContactPhone,
-            ContactEmail = place.ContactEmail,
-            OperatingHoursStart = place.OperatingHoursStart,
-            OperatingHoursEnd = place.OperatingHoursEnd,
-            SpecialInstructions = place.SpecialInstructions,
-            CreatedAt = place.CreatedAt,
-            ModifiedAt = place.ModifiedAt
-        };
-    }
-
-    /// <summary>
-    /// Convierte una entidad Operator a OperatorResponseDto
-    /// </summary>
-    /// <param name="operatorEntity">Entidad Operator</param>
-    /// <returns>DTO de respuesta</returns>
-    private static OperatorResponseDto MapToOperatorResponseDto(Operator operatorEntity)
-    {
-        return new OperatorResponseDto
-        {
-            Id = operatorEntity.Id,
-            FirstName = operatorEntity.FirstName,
-            LastName = operatorEntity.LastName,
-            FullName = operatorEntity.FullName,
-            Email = operatorEntity.Email,
-            Phone = operatorEntity.Phone,
-            EmployeeId = operatorEntity.EmployeeId,
-            LicenseNumber = operatorEntity.LicenseNumber,
-            LicenseExpiryDate = operatorEntity.LicenseExpiryDate,
-            Status = (int)operatorEntity.Status,
-            DateOfBirth = operatorEntity.DateOfBirth,
-            HireDate = operatorEntity.HireDate,
-            Address = operatorEntity.Address,
-            EmergencyContact = operatorEntity.EmergencyContact,
-            EmergencyPhone = operatorEntity.EmergencyPhone,
-            CreatedAt = operatorEntity.CreatedAt,
-            ModifiedAt = operatorEntity.ModifiedAt
-        };
-    }
-
-    /// <summary>
     /// Obtiene todos los viajes con paginación
     /// </summary>
     /// <param name="page">Número de página (por defecto 1)</param>
@@ -132,7 +36,7 @@ public class TripsController : ControllerBase
         {
             var trips = await _tripService.GetTripsAsync(page, pageSize);
             
-            var tripDtos = trips.Select(MapToTripResponseDto);
+            var tripDtos = trips.ToResponseDto();
 
             return Ok(tripDtos);
         }
@@ -160,7 +64,7 @@ public class TripsController : ControllerBase
                 return NotFound($"Viaje con ID {id} no encontrado");
             }
 
-            var tripDto = MapToTripResponseDto(trip);
+            var tripDto = trip.ToResponseDto();
 
             return Ok(tripDto);
         }
@@ -199,7 +103,7 @@ public class TripsController : ControllerBase
             };
 
             var createdTrip = await _tripService.CreateTripAsync(trip);
-            var tripResponse = MapToTripResponseDto(createdTrip);
+            var tripResponse = createdTrip.ToResponseDto();
 
             return CreatedAtAction(nameof(GetTrip), new { id = createdTrip.Id }, tripResponse);
         }
@@ -245,7 +149,7 @@ public class TripsController : ControllerBase
             };
 
             var updatedTrip = await _tripService.UpdateTripAsync(trip);
-            var responseDto = MapToTripResponseDto(updatedTrip);
+            var responseDto = updatedTrip.ToResponseDto();
 
             return Ok(responseDto);
         }
@@ -294,7 +198,7 @@ public class TripsController : ControllerBase
         try
         {
             var trips = await _tripService.GetTripsByStatusAsync(status);
-            var tripDtos = trips.Select(MapToTripResponseDto);
+            var tripDtos = trips.ToResponseDto();
 
             return Ok(tripDtos);
         }
@@ -324,7 +228,7 @@ public class TripsController : ControllerBase
                 updateStatusDto.Notes
             );
 
-            var responseDto = MapToTripResponseDto(updatedTrip);
+            var responseDto = updatedTrip.ToResponseDto();
             return Ok(responseDto);
         }
         catch (ArgumentException ex)

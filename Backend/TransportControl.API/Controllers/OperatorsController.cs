@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using TransportControl.Core.Entities;
 using TransportControl.Core.Interfaces;
 using TransportControl.API.DTOs;
+using TransportControl.API.Mappings;
 
 namespace TransportControl.API.Controllers;
 
@@ -23,35 +24,6 @@ public class OperatorsController : ControllerBase
     }
 
     /// <summary>
-    /// Convierte una entidad Operator a OperatorResponseDto
-    /// </summary>
-    /// <param name="operatorEntity">Entidad Operator</param>
-    /// <returns>DTO de respuesta</returns>
-    private static OperatorResponseDto MapToOperatorResponseDto(Operator operatorEntity)
-    {
-        return new OperatorResponseDto
-        {
-            Id = operatorEntity.Id,
-            FirstName = operatorEntity.FirstName,
-            LastName = operatorEntity.LastName,
-            FullName = operatorEntity.FullName,
-            Email = operatorEntity.Email,
-            Phone = operatorEntity.Phone,
-            EmployeeId = operatorEntity.EmployeeId,
-            LicenseNumber = operatorEntity.LicenseNumber,
-            LicenseExpiryDate = operatorEntity.LicenseExpiryDate,
-            Status = (int)operatorEntity.Status,
-            DateOfBirth = operatorEntity.DateOfBirth,
-            HireDate = operatorEntity.HireDate,
-            Address = operatorEntity.Address,
-            EmergencyContact = operatorEntity.EmergencyContact,
-            EmergencyPhone = operatorEntity.EmergencyPhone,
-            CreatedAt = operatorEntity.CreatedAt,
-            ModifiedAt = operatorEntity.ModifiedAt
-        };
-    }
-
-    /// <summary>
     /// Obtiene todos los operadores activos (sin paginación, para dropdowns)
     /// </summary>
     /// <returns>Lista de operadores activos</returns>
@@ -61,7 +33,7 @@ public class OperatorsController : ControllerBase
         try
         {
             var operators = await _operatorService.GetActiveOperatorsAsync();
-            var operatorDtos = operators.Select(MapToOperatorResponseDto);
+            var operatorDtos = operators.ToResponseDto();
 
             return Ok(operatorDtos);
         }
@@ -89,7 +61,7 @@ public class OperatorsController : ControllerBase
                 return NotFound($"Operador con ID {id} no encontrado");
             }
 
-            var operatorDto = MapToOperatorResponseDto(operatorEntity);
+            var operatorDto = operatorEntity.ToResponseDto();
             return Ok(operatorDto);
         }
         catch (Exception ex)
@@ -110,7 +82,7 @@ public class OperatorsController : ControllerBase
         try
         {
             var createdOperator = await _operatorService.CreateOperatorAsync(operatorEntity);
-            var operatorDto = MapToOperatorResponseDto(createdOperator);
+            var operatorDto = createdOperator.ToResponseDto();
 
             return CreatedAtAction(nameof(GetOperator), new { id = createdOperator.Id }, operatorDto);
         }
@@ -148,7 +120,7 @@ public class OperatorsController : ControllerBase
             }
 
             var updatedOperator = await _operatorService.UpdateOperatorAsync(operatorEntity);
-            var operatorDto = MapToOperatorResponseDto(updatedOperator);
+            var operatorDto = updatedOperator.ToResponseDto();
 
             return Ok(operatorDto);
         }
